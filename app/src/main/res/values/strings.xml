@@ -1,3 +1,6 @@
 <resources>
     <string name="app_name">Face Recognition</string>
+    <string name="preview_photo">Preview Photo</string>
+    <string name="register_face">register face</string>
+    <string name="switch_camera">switch camera</string>
 </resources>
