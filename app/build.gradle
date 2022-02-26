@@ -40,8 +40,14 @@ dependencies {
     implementation "androidx.camera:camera-camera2:${camerax_version}"
     implementation "androidx.camera:camera-view:1.0.0-alpha32"
 
-    // mlkit face detection
+    // mlkit face detection & gson
     implementation "com.google.mlkit:face-detection:16.1.5"
+    implementation "com.google.code.gson:gson:2.8.6"
+
+    // tflite
+    implementation("org.tensorflow:tensorflow-lite:2.4.0") { changing = true }
+    implementation("org.tensorflow:tensorflow-lite-gpu:0.0.0-nightly") { changing = true }
+    implementation("org.tensorflow:tensorflow-lite-support:0.0.0-nightly") { changing = true }
 
     testImplementation 'junit:junit:4.+'
     androidTestImplementation 'androidx.test.ext:junit:1.1.3'
