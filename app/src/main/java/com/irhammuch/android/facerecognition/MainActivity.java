@@ -14,7 +14,9 @@ import androidx.core.content.ContextCompat;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.content.pm.PackageManager;
+import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -39,9 +41,15 @@ import com.google.mlkit.vision.face.Face;
 import com.google.mlkit.vision.face.FaceDetection;
 import com.google.mlkit.vision.face.FaceDetector;
 
+import org.tensorflow.lite.Interpreter;
+
 import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.ReadOnlyBufferException;
+import java.nio.channels.FileChannel;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -60,11 +68,10 @@ public class MainActivity extends AppCompatActivity {
     private GraphicOverlay graphicOverlay;
     private ImageView previewImg;
     private Button addBtn;
-    private String addBtnText = "Add Face";
     private TextView detectionTextView;
 
-    private final String modelFile = "mobile_face_net.tflite"; //model name
     private HashMap<String, SimilarityClassifier.Recognition> registered = new HashMap<>(); //saved Faces
+    private Interpreter tfLite;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -75,8 +82,10 @@ public class MainActivity extends AppCompatActivity {
         graphicOverlay = findViewById(R.id.graphic_overlay);
         previewImg = findViewById(R.id.preview_img);
         addBtn = findViewById(R.id.add_btn);
-        addBtn.setText(addBtnText);
+        addBtn.setText("Add Face");
         detectionTextView = findViewById(R.id.detection_text);
+
+        loadModel();
     }
 
     @Override
@@ -85,14 +94,7 @@ public class MainActivity extends AppCompatActivity {
         startCamera();
     }
 
-    public void startCamera() {
-        if(ContextCompat.checkSelfPermission(this, CAMERA_PERMISSION) == PackageManager.PERMISSION_GRANTED) {
-            setupCamera();
-        } else {
-            getPermissions();
-        }
-    }
-
+    /** Permissions Handler */
     private void getPermissions() {
         ActivityCompat.requestPermissions(this, new String[]{CAMERA_PERMISSION}, PERMISSION_CODE);
     }
@@ -111,6 +113,15 @@ public class MainActivity extends AppCompatActivity {
         }
 
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+    }
+
+    /** Setup camera & use cases */
+    public void startCamera() {
+        if(ContextCompat.checkSelfPermission(this, CAMERA_PERMISSION) == PackageManager.PERMISSION_GRANTED) {
+            setupCamera();
+        } else {
+            getPermissions();
+        }
     }
 
     private void setupCamera() {
@@ -192,6 +203,7 @@ public class MainActivity extends AppCompatActivity {
         return previewView.getDisplay().getRotation();
     }
 
+    /** Face detection processor */
     @SuppressLint("UnsafeOptInUsageError")
     private void analyze(@NonNull ImageProxy image) {
         if (image.getImage() == null) return;
@@ -215,29 +227,20 @@ public class MainActivity extends AppCompatActivity {
         float scaleY = (float) previewView.getHeight() / (float) inputImage.getWidth();
 
         if(faces.size() > 0) {
+            // get first face detected
             Face face = faces.get(0);
+
+            // get bounding box of face;
             boundingBox = face.getBoundingBox();
 
-            //Convert media image to Bitmap
-            Bitmap frame_bmp = toBitmap(inputImage.getMediaImage());
+            // convert img to bitmap & crop img
+            Bitmap bitmap = mediaImgToBmp(
+                    inputImage.getMediaImage(),
+                    inputImage.getRotationDegrees(),
+                    boundingBox);
 
-            //Adjust orientation of Face
-            int rotation = inputImage.getRotationDegrees();
-            Bitmap frame_bmp1 = rotateBitmap(frame_bmp, rotation, false, false);
-
-            //Crop out bounding box from whole Bitmap(image)
-            float padding = 0.0f;
-            RectF adjustedBoundinBox = new RectF(
-                    boundingBox.left - padding,
-                    boundingBox.top - padding,
-                    boundingBox.right + padding,
-                    boundingBox.bottom + padding);
-            Bitmap cropped_face = getCropBitmapByCPU(frame_bmp1, adjustedBoundinBox);
-
-            //Resize bitmap to 112,112
-            Bitmap scaled = getResizedBitmap(cropped_face, 112, 112);
-
-            previewImg.setImageBitmap(scaled);
+            // set image to preview
+            previewImg.setImageBitmap(bitmap);
         }
         else {
             if(registered.isEmpty())
@@ -249,7 +252,31 @@ public class MainActivity extends AppCompatActivity {
         graphicOverlay.draw(boundingBox, scaleX, scaleY);
     }
 
-    public Bitmap getResizedBitmap(Bitmap bm, int newWidth, int newHeight) {
+    /** Bitmap Converter */
+    private Bitmap mediaImgToBmp(Image image, int rotation, Rect boundingBox) {
+        //Convert media image to Bitmap
+        Bitmap frame_bmp = toBitmap(image);
+
+        //Adjust orientation of Face
+
+        Bitmap frame_bmp1 = rotateBitmap(frame_bmp, rotation, false, false);
+
+        //Crop out bounding box from whole Bitmap(image)
+        float padding = 0.0f;
+        RectF adjustedBoundinBox = new RectF(
+                boundingBox.left - padding,
+                boundingBox.top - padding,
+                boundingBox.right + padding,
+                boundingBox.bottom + padding);
+        Bitmap cropped_face = getCropBitmapByCPU(frame_bmp1, adjustedBoundinBox);
+
+        //Resize bitmap to 112,112
+        Bitmap scaled = getResizedBitmap(cropped_face, 112, 112);
+
+        return scaled;
+    }
+
+    private Bitmap getResizedBitmap(Bitmap bm, int newWidth, int newHeight) {
         int width = bm.getWidth();
         int height = bm.getHeight();
         float scaleWidth = ((float) newWidth) / width;
@@ -265,6 +292,7 @@ public class MainActivity extends AppCompatActivity {
         bm.recycle();
         return resizedBitmap;
     }
+
     private static Bitmap getCropBitmapByCPU(Bitmap source, RectF cropRectF) {
         Bitmap resultBitmap = Bitmap.createBitmap((int) cropRectF.width(),
                 (int) cropRectF.height(), Bitmap.Config.ARGB_8888);
@@ -307,6 +335,7 @@ public class MainActivity extends AppCompatActivity {
         }
         return rotatedBitmap;
     }
+
     private static byte[] YUV_420_888toNV21(Image image) {
 
         int width = image.getWidth();
@@ -397,5 +426,25 @@ public class MainActivity extends AppCompatActivity {
         //System.out.println("FORMAT"+image.getFormat());
 
         return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
+    }
+
+    /** Model loader */
+    private void loadModel() {
+        try {
+            //model name
+            String modelFile = "mobile_face_net.tflite";
+            tfLite = new Interpreter(loadModelFile(MainActivity.this, modelFile));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private MappedByteBuffer loadModelFile(Activity activity, String MODEL_FILE) throws IOException {
+        AssetFileDescriptor fileDescriptor = activity.getAssets().openFd(MODEL_FILE);
+        FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
+        FileChannel fileChannel = inputStream.getChannel();
+        long startOffset = fileDescriptor.getStartOffset();
+        long declaredLength = fileDescriptor.getDeclaredLength();
+        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
     }
 }
