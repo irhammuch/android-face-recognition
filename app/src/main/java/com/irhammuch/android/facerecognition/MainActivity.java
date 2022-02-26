@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.pm.PackageManager;
+import android.graphics.Rect;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.Toast;
@@ -31,7 +32,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 public class MainActivity extends AppCompatActivity {
-    private static final String TAG = "facerecognition";
+    private static final String TAG = "MainActivity";
     private static final int PERMISSION_CODE = 1001;
     private static final String CAMERA_PERMISSION = Manifest.permission.CAMERA;
     private PreviewView previewView;
@@ -39,13 +40,15 @@ public class MainActivity extends AppCompatActivity {
     private ProcessCameraProvider cameraProvider;
     private Preview previewUseCase;
     private ImageAnalysis analysisUseCase;
+    private GraphicOverlay graphicOverlay;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         previewView = findViewById(R.id.previewView);
-        previewView.setScaleType(PreviewView.ScaleType.FILL_CENTER);
+        previewView.setScaleType(PreviewView.ScaleType.FIT_CENTER);
+        graphicOverlay = findViewById(R.id.graphic_overlay);
     }
 
     @Override
@@ -173,14 +176,21 @@ public class MainActivity extends AppCompatActivity {
         FaceDetector faceDetector = FaceDetection.getClient();
 
         faceDetector.process(inputImage)
-                .addOnSuccessListener(faces -> onSuccessListener(faces, inputImage, image.getImageInfo().getRotationDegrees()))
+                .addOnSuccessListener(faces -> onSuccessListener(faces, inputImage))
                 .addOnFailureListener(e -> Log.e(TAG, "Barcode process failure", e))
                 .addOnCompleteListener(task -> image.close());
     }
 
-    private void onSuccessListener(List<Face> faces, InputImage image, int rotation) {
+    private void onSuccessListener(List<Face> faces, InputImage inputImage) {
+        Rect boundingBox = new Rect();
+        float scaleX = (float) previewView.getWidth() / (float) inputImage.getHeight();
+        float scaleY = (float) previewView.getHeight() / (float) inputImage.getWidth();
+
         if(faces.size() > 0) {
-            Toast.makeText(this, "Face detected", Toast.LENGTH_SHORT).show();
+            Face face = faces.get(0);
+            boundingBox = face.getBoundingBox();
         }
+
+        graphicOverlay.draw(boundingBox, scaleX, scaleY);
     }
 }
