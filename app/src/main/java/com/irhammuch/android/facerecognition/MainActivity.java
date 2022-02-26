@@ -1,17 +1,5 @@
 package com.irhammuch.android.facerecognition;
 
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.camera.core.AspectRatio;
-import androidx.camera.core.CameraSelector;
-import androidx.camera.core.ImageAnalysis;
-import androidx.camera.core.ImageProxy;
-import androidx.camera.core.Preview;
-import androidx.camera.lifecycle.ProcessCameraProvider;
-import androidx.camera.view.PreviewView;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
-
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -29,11 +17,27 @@ import android.graphics.RectF;
 import android.graphics.YuvImage;
 import android.media.Image;
 import android.os.Bundle;
+import android.text.InputType;
 import android.util.Log;
+import android.util.Pair;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.camera.core.AspectRatio;
+import androidx.camera.core.CameraSelector;
+import androidx.camera.core.ImageAnalysis;
+import androidx.camera.core.ImageProxy;
+import androidx.camera.core.Preview;
+import androidx.camera.lifecycle.ProcessCameraProvider;
+import androidx.camera.view.PreviewView;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.mlkit.vision.common.InputImage;
@@ -47,11 +51,13 @@ import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.nio.ReadOnlyBufferException;
 import java.nio.channels.FileChannel;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -67,11 +73,18 @@ public class MainActivity extends AppCompatActivity {
     private ImageAnalysis analysisUseCase;
     private GraphicOverlay graphicOverlay;
     private ImageView previewImg;
-    private Button addBtn;
     private TextView detectionTextView;
 
-    private HashMap<String, SimilarityClassifier.Recognition> registered = new HashMap<>(); //saved Faces
+    private final HashMap<String, SimilarityClassifier.Recognition> registered = new HashMap<>(); //saved Faces
     private Interpreter tfLite;
+
+    private boolean start = true;
+    private float[][] embeedings;
+
+    private static final float IMAGE_MEAN = 128.0f;
+    private static final float IMAGE_STD = 128.0f;
+    private static final int INPUT_SIZE = 112;
+    private static final int OUTPUT_SIZE=192;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -81,9 +94,11 @@ public class MainActivity extends AppCompatActivity {
         previewView.setScaleType(PreviewView.ScaleType.FIT_CENTER);
         graphicOverlay = findViewById(R.id.graphic_overlay);
         previewImg = findViewById(R.id.preview_img);
-        addBtn = findViewById(R.id.add_btn);
-        addBtn.setText("Add Face");
         detectionTextView = findViewById(R.id.detection_text);
+
+        Button addBtn = findViewById(R.id.add_btn);
+        addBtn.setText("Add Face");
+        addBtn.setOnClickListener((v -> addFace()));
 
         loadModel();
     }
@@ -239,8 +254,7 @@ public class MainActivity extends AppCompatActivity {
                     inputImage.getRotationDegrees(),
                     boundingBox);
 
-            // set image to preview
-            previewImg.setImageBitmap(bitmap);
+            if(start) recognizeImage(bitmap);
         }
         else {
             if(registered.isEmpty())
@@ -250,6 +264,123 @@ public class MainActivity extends AppCompatActivity {
         }
 
         graphicOverlay.draw(boundingBox, scaleX, scaleY);
+    }
+
+    /** Recognize Processor */
+    private void addFace() {
+        start=false;
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Enter Name");
+
+        // Set up the input
+        final EditText input = new EditText(this);
+
+        input.setInputType(InputType.TYPE_CLASS_TEXT );
+        builder.setView(input);
+
+        // Set up the buttons
+        builder.setPositiveButton("ADD", (dialog, which) -> {
+            //Toast.makeText(context, input.getText().toString(), Toast.LENGTH_SHORT).show();
+
+            //Create and Initialize new object with Face embeddings and Name.
+            SimilarityClassifier.Recognition result = new SimilarityClassifier.Recognition(
+                    "0", "", -1f);
+            result.setExtra(embeedings);
+
+            registered.put( input.getText().toString(),result);
+            start = true;
+
+        });
+        builder.setNegativeButton("Cancel", (dialog, which) -> {
+            start = true;
+            dialog.cancel();
+        });
+
+        builder.show();
+    }
+
+    public void recognizeImage(final Bitmap bitmap) {
+        // set image to preview
+        previewImg.setImageBitmap(bitmap);
+
+        //Create ByteBuffer to store normalized image
+
+        ByteBuffer imgData = ByteBuffer.allocateDirect(INPUT_SIZE * INPUT_SIZE * 3 * 4);
+
+        imgData.order(ByteOrder.nativeOrder());
+
+        int[] intValues = new int[INPUT_SIZE * INPUT_SIZE];
+
+        //get pixel values from Bitmap to normalize
+        bitmap.getPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
+
+        imgData.rewind();
+
+        for (int i = 0; i < INPUT_SIZE; ++i) {
+            for (int j = 0; j < INPUT_SIZE; ++j) {
+                int pixelValue = intValues[i * INPUT_SIZE + j];
+                imgData.putFloat((((pixelValue >> 16) & 0xFF) - IMAGE_MEAN) / IMAGE_STD);
+                imgData.putFloat((((pixelValue >> 8) & 0xFF) - IMAGE_MEAN) / IMAGE_STD);
+                imgData.putFloat(((pixelValue & 0xFF) - IMAGE_MEAN) / IMAGE_STD);
+            }
+        }
+        //imgData is input to our model
+        Object[] inputArray = {imgData};
+
+        Map<Integer, Object> outputMap = new HashMap<>();
+
+
+        embeedings = new float[1][OUTPUT_SIZE]; //output of model will be stored in this variable
+
+        outputMap.put(0, embeedings);
+
+        tfLite.runForMultipleInputsOutputs(inputArray, outputMap); //Run model
+
+
+
+        float distance;
+
+        //Compare new face with saved Faces.
+        if (registered.size() > 0) {
+
+            final Pair<String, Float> nearest = findNearest(embeedings[0]);//Find closest matching face
+
+            if (nearest != null) {
+
+                final String name = nearest.first;
+                distance = nearest.second;
+                if(distance<1.000f) //If distance between Closest found face is more than 1.000 ,then output UNKNOWN face.
+                    detectionTextView.setText(name);
+                else
+                    detectionTextView.setText("Unknown");
+                System.out.println("nearest: " + name + " - distance: " + distance);
+            }
+        }
+
+    }
+
+    //Compare Faces by distance between face embeddings
+    private Pair<String, Float> findNearest(float[] emb) {
+
+        Pair<String, Float> ret = null;
+        for (Map.Entry<String, SimilarityClassifier.Recognition> entry : registered.entrySet()) {
+
+            final String name = entry.getKey();
+            final float[] knownEmb = ((float[][]) entry.getValue().getExtra())[0];
+
+            float distance = 0;
+            for (int i = 0; i < emb.length; i++) {
+                float diff = emb[i] - knownEmb[i];
+                distance += diff*diff;
+            }
+            distance = (float) Math.sqrt(distance);
+            if (ret == null || distance < ret.second) {
+                ret = new Pair<>(name, distance);
+            }
+        }
+
+        return ret;
+
     }
 
     /** Bitmap Converter */
@@ -271,16 +402,14 @@ public class MainActivity extends AppCompatActivity {
         Bitmap cropped_face = getCropBitmapByCPU(frame_bmp1, adjustedBoundinBox);
 
         //Resize bitmap to 112,112
-        Bitmap scaled = getResizedBitmap(cropped_face, 112, 112);
-
-        return scaled;
+        return getResizedBitmap(cropped_face);
     }
 
-    private Bitmap getResizedBitmap(Bitmap bm, int newWidth, int newHeight) {
+    private Bitmap getResizedBitmap(Bitmap bm) {
         int width = bm.getWidth();
         int height = bm.getHeight();
-        float scaleWidth = ((float) newWidth) / width;
-        float scaleHeight = ((float) newHeight) / height;
+        float scaleWidth = ((float) 112) / width;
+        float scaleHeight = ((float) 112) / height;
         // CREATE A MATRIX FOR THE MANIPULATION
         Matrix matrix = new Matrix();
         // RESIZE THE BIT MAP
@@ -421,14 +550,12 @@ public class MainActivity extends AppCompatActivity {
         yuvImage.compressToJpeg(new Rect(0, 0, yuvImage.getWidth(), yuvImage.getHeight()), 75, out);
 
         byte[] imageBytes = out.toByteArray();
-        //System.out.println("bytes"+ Arrays.toString(imageBytes));
-
-        //System.out.println("FORMAT"+image.getFormat());
 
         return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
     }
 
     /** Model loader */
+    @SuppressWarnings("deprecation")
     private void loadModel() {
         try {
             //model name
