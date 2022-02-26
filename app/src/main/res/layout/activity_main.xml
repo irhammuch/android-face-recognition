@@ -22,38 +22,71 @@
         app:layout_constraintTop_toTopOf="@id/previewView"
         app:layout_constraintBottom_toBottomOf="@id/previewView"/>
 
-    <ImageView
-        android:id="@+id/preview_img"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:background="@color/white"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/previewView"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintDimensionRatio="1:1"/>
-
     <TextView
         android:id="@+id/detection_text"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="20dp"
-        android:textSize="20sp"
-        android:textStyle="bold"
+        android:textSize="18sp"
         android:textColor="@color/white"
-        app:layout_constraintStart_toEndOf="@id/preview_img"
+        android:textAlignment="center"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toBottomOf="@id/previewView"
         app:layout_constraintBottom_toTopOf="@id/add_btn"/>
 
-    <Button
+    <androidx.cardview.widget.CardView
+        android:id="@+id/preview_img_card"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:cardBackgroundColor="#00000000"
+        app:cardCornerRadius="100dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/detection_text"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/add_btn"
+        app:layout_constraintDimensionRatio="1:1">
+
+        <ImageView
+            android:id="@+id/preview_img"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:background="@drawable/roundedcorner"
+            android:src="@drawable/outline_image_24"
+            android:scaleType="centerInside"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/detection_text"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/add_btn"
+            app:layout_constraintDimensionRatio="1:1"
+            android:contentDescription="@string/preview_photo" />
+    </androidx.cardview.widget.CardView>
+
+
+    <ImageButton
         android:id="@+id/add_btn"
-        android:layout_width="0dp"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:background="@drawable/white_roundedcorner"
+        android:src="@drawable/outline_add_black_48"
+        app:layout_constraintStart_toEndOf="@id/preview_img_card"
+        app:layout_constraintEnd_toEndOf="@id/switch_camera"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/detection_text"
+        app:tint="@color/teal_700"
+        android:contentDescription="@string/register_face" />
+
+    <ImageButton
+        android:id="@+id/switch_camera"
+        android:layout_width="50dp"
         android:layout_height="50dp"
-        android:layout_marginHorizontal="20dp"
-        android:layout_marginVertical="10dp"
-        app:layout_constraintStart_toEndOf="@id/preview_img"
+        android:background="@drawable/roundedcorner"
+        android:src="@drawable/outline_flip_camera_android_24"
+        app:layout_constraintStart_toEndOf="@id/add_btn"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/detection_text"/>
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/detection_text"
+        android:contentDescription="@string/switch_camera" />
 
 
 </androidx.constraintlayout.widget.ConstraintLayout>

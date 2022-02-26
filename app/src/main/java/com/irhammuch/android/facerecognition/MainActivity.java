@@ -22,6 +22,7 @@ import android.util.Log;
 import android.util.Pair;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -96,8 +97,7 @@ public class MainActivity extends AppCompatActivity {
         previewImg = findViewById(R.id.preview_img);
         detectionTextView = findViewById(R.id.detection_text);
 
-        Button addBtn = findViewById(R.id.add_btn);
-        addBtn.setText("Add Face");
+        ImageButton addBtn = findViewById(R.id.add_btn);
         addBtn.setOnClickListener((v -> addFace()));
 
         loadModel();

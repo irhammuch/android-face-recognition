@@ -3,6 +3,13 @@
   <component name="DesignSurface">
     <option name="filePathToZoomLevelMap">
       <map>
+        <entry key="..\:/Irham/personal/experiments/android/FaceRecognition/app/src/main/res/drawable/outline_add_24.xml" value="0.11296296296296296" />
+        <entry key="..\:/Irham/personal/experiments/android/FaceRecognition/app/src/main/res/drawable/outline_add_a_photo_24.xml" value="0.11296296296296296" />
+        <entry key="..\:/Irham/personal/experiments/android/FaceRecognition/app/src/main/res/drawable/outline_crop_original_24.xml" value="0.11296296296296296" />
+        <entry key="..\:/Irham/personal/experiments/android/FaceRecognition/app/src/main/res/drawable/outline_flip_camera_android_24.xml" value="0.11296296296296296" />
+        <entry key="..\:/Irham/personal/experiments/android/FaceRecognition/app/src/main/res/drawable/outline_image_24.xml" value="0.11296296296296296" />
+        <entry key="..\:/Irham/personal/experiments/android/FaceRecognition/app/src/main/res/drawable/roundedcorner.xml" value="0.11296296296296296" />
+        <entry key="..\:/Irham/personal/experiments/android/FaceRecognition/app/src/main/res/drawable/white_roundedcorner.xml" value="0.11296296296296296" />
         <entry key="..\:/Irham/personal/experiments/android/FaceRecognition/app/src/main/res/layout/activity_main.xml" value="0.1" />
       </map>
     </option>
