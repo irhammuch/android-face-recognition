@@ -20,7 +20,6 @@ import android.os.Bundle;
 import android.text.InputType;
 import android.util.Log;
 import android.util.Pair;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -237,11 +236,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void onSuccessListener(List<Face> faces, InputImage inputImage) {
-        Rect boundingBox = new Rect();
+        Rect boundingBox = null;
+        String name = null;
         float scaleX = (float) previewView.getWidth() / (float) inputImage.getHeight();
         float scaleY = (float) previewView.getHeight() / (float) inputImage.getWidth();
 
         if(faces.size() > 0) {
+            detectionTextView.setText("Face Detected");
             // get first face detected
             Face face = faces.get(0);
 
@@ -254,16 +255,14 @@ public class MainActivity extends AppCompatActivity {
                     inputImage.getRotationDegrees(),
                     boundingBox);
 
-            if(start) recognizeImage(bitmap);
+            if(start) name = recognizeImage(bitmap);
+            if(name != null) detectionTextView.setText(name);
         }
         else {
-            if(registered.isEmpty())
-                detectionTextView.setText("Add Faces");
-            else
-                detectionTextView.setText("No Face Detected!");
+            detectionTextView.setText("No Face Detected!");
         }
 
-        graphicOverlay.draw(boundingBox, scaleX, scaleY);
+        graphicOverlay.draw(boundingBox, scaleX, scaleY, name);
     }
 
     /** Recognize Processor */
@@ -276,6 +275,7 @@ public class MainActivity extends AppCompatActivity {
         final EditText input = new EditText(this);
 
         input.setInputType(InputType.TYPE_CLASS_TEXT );
+        input.setMaxWidth(200);
         builder.setView(input);
 
         // Set up the buttons
@@ -299,7 +299,7 @@ public class MainActivity extends AppCompatActivity {
         builder.show();
     }
 
-    public void recognizeImage(final Bitmap bitmap) {
+    public String recognizeImage(final Bitmap bitmap) {
         // set image to preview
         previewImg.setImageBitmap(bitmap);
 
@@ -350,13 +350,13 @@ public class MainActivity extends AppCompatActivity {
                 final String name = nearest.first;
                 distance = nearest.second;
                 if(distance<1.000f) //If distance between Closest found face is more than 1.000 ,then output UNKNOWN face.
-                    detectionTextView.setText(name);
+                    return name;
                 else
-                    detectionTextView.setText("Unknown");
-                System.out.println("nearest: " + name + " - distance: " + distance);
+                    return "unknown";
             }
         }
 
+        return null;
     }
 
     //Compare Faces by distance between face embeddings
