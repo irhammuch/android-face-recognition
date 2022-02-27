@@ -3,4 +3,6 @@
     <string name="preview_photo">Preview Photo</string>
     <string name="register_face">register face</string>
     <string name="switch_camera">switch camera</string>
+    <string name="face_detected">Face Detected</string>
+    <string name="no_face_detected">No Face Detected!</string>
 </resources>

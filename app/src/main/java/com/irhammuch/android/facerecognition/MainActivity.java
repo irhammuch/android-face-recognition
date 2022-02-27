@@ -69,6 +69,7 @@ public class MainActivity extends AppCompatActivity {
     private PreviewView previewView;
     private CameraSelector cameraSelector;
     private ProcessCameraProvider cameraProvider;
+    private int lensFacing = CameraSelector.LENS_FACING_BACK;
     private Preview previewUseCase;
     private ImageAnalysis analysisUseCase;
     private GraphicOverlay graphicOverlay;
@@ -77,9 +78,9 @@ public class MainActivity extends AppCompatActivity {
 
     private final HashMap<String, SimilarityClassifier.Recognition> registered = new HashMap<>(); //saved Faces
     private Interpreter tfLite;
-
+    private boolean flipX = false;
     private boolean start = true;
-    private float[][] embeedings;
+    private float[][] embeddings;
 
     private static final float IMAGE_MEAN = 128.0f;
     private static final float IMAGE_STD = 128.0f;
@@ -98,6 +99,9 @@ public class MainActivity extends AppCompatActivity {
 
         ImageButton addBtn = findViewById(R.id.add_btn);
         addBtn.setOnClickListener((v -> addFace()));
+
+        ImageButton switchCamBtn = findViewById(R.id.switch_camera);
+        switchCamBtn.setOnClickListener((view -> switchCamera()));
 
         loadModel();
     }
@@ -130,7 +134,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /** Setup camera & use cases */
-    public void startCamera() {
+    private void startCamera() {
         if(ContextCompat.checkSelfPermission(this, CAMERA_PERMISSION) == PackageManager.PERMISSION_GRANTED) {
             setupCamera();
         } else {
@@ -142,7 +146,6 @@ public class MainActivity extends AppCompatActivity {
         final ListenableFuture<ProcessCameraProvider> cameraProviderFuture =
                 ProcessCameraProvider.getInstance(this);
 
-        int lensFacing = CameraSelector.LENS_FACING_BACK;
         cameraSelector = new CameraSelector.Builder().requireLensFacing(lensFacing).build();
 
         cameraProviderFuture.addListener(() -> {
@@ -217,6 +220,19 @@ public class MainActivity extends AppCompatActivity {
         return previewView.getDisplay().getRotation();
     }
 
+    private void switchCamera() {
+        if (lensFacing == CameraSelector.LENS_FACING_BACK) {
+            lensFacing = CameraSelector.LENS_FACING_FRONT;
+            flipX = true;
+        } else {
+            lensFacing = CameraSelector.LENS_FACING_BACK;
+            flipX = false;
+        }
+
+        if(cameraProvider != null) cameraProvider.unbindAll();
+        startCamera();
+    }
+
     /** Face detection processor */
     @SuppressLint("UnsafeOptInUsageError")
     private void analyze(@NonNull ImageProxy image) {
@@ -242,7 +258,7 @@ public class MainActivity extends AppCompatActivity {
         float scaleY = (float) previewView.getHeight() / (float) inputImage.getWidth();
 
         if(faces.size() > 0) {
-            detectionTextView.setText("Face Detected");
+            detectionTextView.setText(R.string.face_detected);
             // get first face detected
             Face face = faces.get(0);
 
@@ -259,7 +275,7 @@ public class MainActivity extends AppCompatActivity {
             if(name != null) detectionTextView.setText(name);
         }
         else {
-            detectionTextView.setText("No Face Detected!");
+            detectionTextView.setText(R.string.no_face_detected);
         }
 
         graphicOverlay.draw(boundingBox, scaleX, scaleY, name);
@@ -285,7 +301,7 @@ public class MainActivity extends AppCompatActivity {
             //Create and Initialize new object with Face embeddings and Name.
             SimilarityClassifier.Recognition result = new SimilarityClassifier.Recognition(
                     "0", "", -1f);
-            result.setExtra(embeedings);
+            result.setExtra(embeddings);
 
             registered.put( input.getText().toString(),result);
             start = true;
@@ -330,9 +346,9 @@ public class MainActivity extends AppCompatActivity {
         Map<Integer, Object> outputMap = new HashMap<>();
 
 
-        embeedings = new float[1][OUTPUT_SIZE]; //output of model will be stored in this variable
+        embeddings = new float[1][OUTPUT_SIZE]; //output of model will be stored in this variable
 
-        outputMap.put(0, embeedings);
+        outputMap.put(0, embeddings);
 
         tfLite.runForMultipleInputsOutputs(inputArray, outputMap); //Run model
 
@@ -343,7 +359,7 @@ public class MainActivity extends AppCompatActivity {
         //Compare new face with saved Faces.
         if (registered.size() > 0) {
 
-            final Pair<String, Float> nearest = findNearest(embeedings[0]);//Find closest matching face
+            final Pair<String, Float> nearest = findNearest(embeddings[0]);//Find closest matching face
 
             if (nearest != null) {
 
@@ -389,17 +405,16 @@ public class MainActivity extends AppCompatActivity {
         Bitmap frame_bmp = toBitmap(image);
 
         //Adjust orientation of Face
-
-        Bitmap frame_bmp1 = rotateBitmap(frame_bmp, rotation, false, false);
+        Bitmap frame_bmp1 = rotateBitmap(frame_bmp, rotation, flipX);
 
         //Crop out bounding box from whole Bitmap(image)
         float padding = 0.0f;
-        RectF adjustedBoundinBox = new RectF(
+        RectF adjustedBoundingBox = new RectF(
                 boundingBox.left - padding,
                 boundingBox.top - padding,
                 boundingBox.right + padding,
                 boundingBox.bottom + padding);
-        Bitmap cropped_face = getCropBitmapByCPU(frame_bmp1, adjustedBoundinBox);
+        Bitmap cropped_face = getCropBitmapByCPU(frame_bmp1, adjustedBoundingBox);
 
         //Resize bitmap to 112,112
         return getResizedBitmap(cropped_face);
@@ -425,19 +440,19 @@ public class MainActivity extends AppCompatActivity {
     private static Bitmap getCropBitmapByCPU(Bitmap source, RectF cropRectF) {
         Bitmap resultBitmap = Bitmap.createBitmap((int) cropRectF.width(),
                 (int) cropRectF.height(), Bitmap.Config.ARGB_8888);
-        Canvas cavas = new Canvas(resultBitmap);
+        Canvas canvas = new Canvas(resultBitmap);
 
         // draw background
         Paint paint = new Paint(Paint.FILTER_BITMAP_FLAG);
         paint.setColor(Color.WHITE);
-        cavas.drawRect(//from  w w  w. ja v  a  2s. c  om
+        canvas.drawRect(//from  w w  w. ja v  a  2s. c  om
                 new RectF(0, 0, cropRectF.width(), cropRectF.height()),
                 paint);
 
         Matrix matrix = new Matrix();
         matrix.postTranslate(-cropRectF.left, -cropRectF.top);
 
-        cavas.drawBitmap(source, matrix, paint);
+        canvas.drawBitmap(source, matrix, paint);
 
         if (source != null && !source.isRecycled()) {
             source.recycle();
@@ -447,14 +462,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private static Bitmap rotateBitmap(
-            Bitmap bitmap, int rotationDegrees, boolean flipX, boolean flipY) {
+            Bitmap bitmap, int rotationDegrees, boolean flipX) {
         Matrix matrix = new Matrix();
 
         // Rotate the image back to straight.
         matrix.postRotate(rotationDegrees);
 
         // Mirror the image along the X or Y axis.
-        matrix.postScale(flipX ? -1.0f : 1.0f, flipY ? -1.0f : 1.0f);
+        matrix.postScale(flipX ? -1.0f : 1.0f, 1.0f);
         Bitmap rotatedBitmap =
                 Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
 
